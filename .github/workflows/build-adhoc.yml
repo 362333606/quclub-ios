@@ -58,7 +58,7 @@ jobs:
             -destination 'generic/platform=iOS' \
             -archivePath "$RUNNER_TEMP/QiuYuAI.xcarchive" \
             CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
-            PROVISIONING_PROFILE_SPECIFIER="QiuYu AdHoc 20260903" \
+            PROVISIONING_PROFILE_SPECIFIER="QuClub AdHoc 20260904" \
             | grep -E "error|warning: |ARCHIVE" || true
           test -d "$RUNNER_TEMP/QiuYuAI.xcarchive"
 
