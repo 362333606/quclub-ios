@@ -108,11 +108,27 @@ jobs:
           cp "$RUNNER_TEMP/profile.mobileprovision" "$PP_DIR/$UUID.mobileprovision"
           echo "profile UUID=$UUID"
 
-      # ── 5. pod install ──
+      # ── 5. pod install + Pods禁签名 ──
       - name: CocoaPods install
         working-directory: /tmp/sdk/out/SDK/HBuilder-Hello
         run: |
           pod install --repo-update
+      - name: Fix Pods signing (静态库不签名)
+        working-directory: /tmp/sdk/out/SDK/HBuilder-Hello
+        run: |
+          ruby -e "
+            require 'xcodeproj'
+            p = Xcodeproj::Project.open('Pods/Pods.xcodeproj')
+            p.targets.each do |t|
+              t.build_configurations.each do |c|
+                c.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
+                c.build_settings['CODE_SIGN_STYLE'] = 'Automatic'
+                c.build_settings['PROVISIONING_PROFILE_SPECIFIER'] = ''
+              end
+            end
+            p.save
+            puts 'Pods signing fixed'
+          "
 
       # ── 6. Archive ──
       - name: Archive (AdHoc)
