@@ -110,7 +110,7 @@ jobs:
 
       # ── 5. pod install ──
       - name: CocoaPods install
-        working-directory: /tmp/sdk/out/HBuilder-Hello
+        working-directory: /tmp/sdk/out/SDK/HBuilder-Hello
         run: |
           pod install --repo-update
 
@@ -120,7 +120,7 @@ jobs:
           BUILD_NUMBER: ${{ github.run_number }}
         run: |
           set -o pipefail
-          cd /tmp/sdk/out/HBuilder-Hello
+          cd /tmp/sdk/out/SDK/HBuilder-Hello
           xcodebuild archive \
             -workspace HBuilder-Hello.xcworkspace \
             -scheme HBuilder \
