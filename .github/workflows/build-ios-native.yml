@@ -14,7 +14,7 @@ jobs:
   build:
     name: 离线打包 AdHoc
     runs-on: macos-26
-    timeout-minutes: 90
+    timeout-minutes: 180
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,12 +25,22 @@ jobs:
           test -f www/app-service.js && test -f www/manifest.json
           ls www/ | head -25
 
-      # ── 2. 下载 iOS 离线 SDK (Release 资产) ──
+      # ── 2. 下载 iOS 离线 SDK (Release 资产, 带缓存) ──
+      - name: Cache iOS SDK zip
+        id: sdk-cache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/iOS-SDK.zip
+          key: native-sdk-ios-525-clean-v1
       - name: Download iOS SDK
+        if: steps.sdk-cache.outputs.cache-hit != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release download native-sdk -R "$GITHUB_REPOSITORY" -p 'iOS-SDK*.zip' -O /tmp/iOS-SDK.zip
+          ls -la /tmp/iOS-SDK.zip
+      - name: Unzip iOS SDK
+        run: |
           ls -la /tmp/iOS-SDK.zip
           mkdir -p /tmp/sdk && cd /tmp/sdk
           unzip -q /tmp/iOS-SDK.zip -d out  # 净版: SDK/, HBuilder-Hello/ ...
@@ -112,7 +122,7 @@ jobs:
       - name: CocoaPods install
         working-directory: /tmp/sdk/out/SDK/HBuilder-Hello
         run: |
-          pod install --repo-update
+          pod install
       - name: Fix Pods signing (静态库不签名)
         working-directory: /tmp/sdk/out/SDK/HBuilder-Hello
         run: |
