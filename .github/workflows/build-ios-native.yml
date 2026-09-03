@@ -48,9 +48,18 @@ jobs:
           ls "$APP_DIR/www/" | head -8
           test -f "$APP_DIR/www/manifest.json" || { echo "www拷贝失败"; exit 1; }
           # manifest.json 的 id 替换为新 appid(与 Pandora 目录一致)
-          python3 - <<'PY'
-          import json, os
-          p = os.path.join(os.environ['APP_DIR_WWW'], 'manifest.json')
+          echo "APP_DIR长度: ${#APP_DIR}"
+          find "$HB/HBuilder-Hello/Pandora/apps" -maxdepth 2 -type d | head -5
+          APP_DIR="$APP_DIR" APPID="$APPID" python3 - <<'PY'
+          import json, os, glob
+          d = os.environ['APP_DIR']
+          print('python APP_DIR repr:', repr(d[-20:]))
+          p = os.path.join(d, 'www', 'manifest.json')
+          print('manifest存在:', os.path.exists(p))
+          if not os.path.exists(p):
+              cand = glob.glob(os.path.join(d, 'www', 'manifest.json'))
+              print('glob:', cand)
+              raise SystemExit(1)
           m = json.load(open(p))
           m['id'] = os.environ['APPID']
           json.dump(m, open(p, 'w'), ensure_ascii=False, indent=2)
@@ -76,8 +85,6 @@ jobs:
           # 显示名
           plutil -replace CFBundleDisplayName -string "趣club" "$HB/HBuilder-Hello/Info.plist" 2>/dev/null || true
           plutil -replace CFBundleName -string "趣club" "$HB/HBuilder-Hello/Info.plist" 2>/dev/null || true
-        env:
-          APP_DIR_WWW: /tmp/sdk/out/SDK/HBuilder-Hello/Pandora/apps/${{ secrets.DCLOUD_APPID }}/www
 
       # ── 4. 签名材料 ──
       - name: Import certificate & profile
