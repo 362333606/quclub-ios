@@ -42,9 +42,11 @@ jobs:
         run: |
           HB=/tmp/sdk/out/SDK/HBuilder-Hello
           APP_DIR="$HB/HBuilder-Hello/Pandora/apps/$APPID"
-          rm -rf "$HB/HBuilder-Hello/Pandora/apps/__UNI__33C5XXX"
-          mkdir -p "$APP_DIR"
+          rm -rf "$HB/HBuilder-Hello/Pandora/apps/__UNI__33C5XXX" "$HB/HBuilder-Hello/Pandora/apps/__UNI__2302A5F"
+          mkdir -p "$APP_DIR/www"
           cp -R www/. "$APP_DIR/www/"
+          ls "$APP_DIR/www/" | head -8
+          test -f "$APP_DIR/www/manifest.json" || { echo "www拷贝失败"; exit 1; }
           # manifest.json 的 id 替换为新 appid(与 Pandora 目录一致)
           python3 - <<'PY'
           import json, os
