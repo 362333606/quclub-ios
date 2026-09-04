@@ -1,4 +1,4 @@
-name: iOS Native Build (趣club uni-app离线打包)
+name: iOS Native Build (趣club uni-app离线打包·v4妹妹成熟配方)
 
 on:
   workflow_dispatch:
@@ -13,17 +13,17 @@ env:
 jobs:
   build:
     name: 离线打包 AdHoc
-    runs-on: macos-26
-    timeout-minutes: 180
+    runs-on: macos-15
+    timeout-minutes: 150
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # ── 1. www 资源(仓库内已编好的 app-plus 产物) ──
+      # ── 1. www 资源(仓库内已编好的 app-plus 产物,9-4与本地build同版本2.1.0) ──
       - name: Check www
         run: |
           test -f www/app-service.js && test -f www/manifest.json
-          ls www/ | head -25
+          ls www/ | head -10
 
       # ── 2. 下载 iOS 离线 SDK (Release 资产, 带缓存) ──
       - name: Cache iOS SDK zip
@@ -39,64 +39,80 @@ jobs:
         run: |
           gh release download native-sdk -R "$GITHUB_REPOSITORY" -p 'iOS-SDK*.zip' -O /tmp/iOS-SDK.zip
           ls -la /tmp/iOS-SDK.zip
-      - name: Unzip iOS SDK
+      - name: Unzip & verify iOS SDK
         run: |
-          ls -la /tmp/iOS-SDK.zip
           mkdir -p /tmp/sdk && cd /tmp/sdk
-          unzip -q /tmp/iOS-SDK.zip -d out  # 净版: SDK/, HBuilder-Hello/ ...
-          ls out/
+          unzip -q /tmp/iOS-SDK.zip -d out   # 净版: 根目录是 SDK/
           ls out/SDK/ | head
+          # 强校验:解压报成功但内容为空(zip64坑)立即中止
+          python3 - <<'PY'
+          import os, sys
+          need = ['SDK/uniapp.podspec', 'SDK/HBuilder-Hello/Podfile', 'SDK/HBuilder-Hello/HBuilder-Hello/control.xml']
+          base = '/tmp/sdk/out'
+          missing = [n for n in need if not os.path.exists(os.path.join(base, n))]
+          total = sum(sum(f.st_size for f in fs) for _,_,fs in os.walk(base))
+          print(f'展开总:{total/1048576:.0f}MB missing={missing}')
+          if missing or total < 1_500_000_000:
+              print('FATAL: SDK解压校验失败'); sys.exit(1)
+          print('SDK校验通过')
+          PY
 
-      # ── 3. 组装: www + control.xml + bundle id ──
+      # ── 3. 组装: www + control.xml + bundle id + scheme (妹妹配方) ──
       - name: Assemble project
         run: |
           HB=/tmp/sdk/out/SDK/HBuilder-Hello
-          APP_DIR="$HB/HBuilder-Hello/Pandora/apps/$APPID"
-          rm -rf "$HB/HBuilder-Hello/Pandora/apps/__UNI__33C5XXX" "$HB/HBuilder-Hello/Pandora/apps/__UNI__2302A5F"
+          APP_ROOT="$HB/HBuilder-Hello"
+          APP_DIR="$APP_ROOT/Pandora/apps/$APPID"
+          rm -rf "$APP_ROOT/Pandora/apps/"*/
           mkdir -p "$APP_DIR/www"
           cp -R www/. "$APP_DIR/www/"
-          ls "$APP_DIR/www/" | head -8
-          test -f "$APP_DIR/www/manifest.json" || { echo "www拷贝失败"; exit 1; }
-          # manifest.json 的 id 替换为新 appid(与 Pandora 目录一致)
-          echo "APP_DIR长度: ${#APP_DIR}"
-          find "$HB/HBuilder-Hello/Pandora/apps" -maxdepth 2 -type d | head -5
-          APP_DIR="$APP_DIR" APPID="$APPID" python3 - <<'PY'
-          import json, os, glob
-          d = os.environ['APP_DIR']
-          print('python APP_DIR repr:', repr(d[-20:]))
-          p = os.path.join(d, 'www', 'manifest.json')
-          print('manifest存在:', os.path.exists(p))
-          if not os.path.exists(p):
-              cand = glob.glob(os.path.join(d, 'www', 'manifest.json'))
-              print('glob:', cand)
-              raise SystemExit(1)
-          m = json.load(open(p))
-          m['id'] = os.environ['APPID']
-          json.dump(m, open(p, 'w'), ensure_ascii=False, indent=2)
-          print('manifest id ->', m['id'])
-          PY
-          # control.xml: appid + appkey + 关debug
-          cat > "$HB/HBuilder-Hello/control.xml" <<XML
+          test -f "$APP_DIR/www/manifest.json" || { echo www拷贝失败; exit 1; }
+          cat > "$APP_ROOT/control.xml" <<XML
           <?xml version="1.0" encoding="utf-8"?>
           <HBuilder debug="false" version="5.25.2026082902">
             <apps>
-              <app appid="$APPID" appver="2.0.0" appkey="$APPKEY"/>
+              <app appid="$APPID" appver="2.1.0" appkey="$APPKEY"/>
             </apps>
           </HBuilder>
           XML
-          # bundle id
           python3 - <<'PY'
+          # bundle id + Podfile两砍(定位UTS插件链接不匹配/外部specs大仓)——妹妹验证过的配方
           p = '/tmp/sdk/out/SDK/HBuilder-Hello/HBuilder-Hello.xcodeproj/project.pbxproj'
           c = open(p).read()
           c = c.replace('com.dcloud.XXX', 'cn.qyai001.quclub').replace('io.dcloud.HBuilder', 'cn.qyai001.quclub')
           open(p, 'w').write(c)
           print('bundle id ok')
+          pf = '/tmp/sdk/out/SDK/HBuilder-Hello/Podfile'
+          c2 = open(pf).read()
+          assert "'Geolocation-Tencent'," in c2, 'Podfile锚点没找到'
+          c2 = c2.replace("   'Geolocation-Tencent',", "   # 'Geolocation-Tencent', # 砍:UTS插件Xcode16.4链接符号不匹配;坐标走系统核心定位,地址走后端/ws/geocoder逆地理")
+          c2 = c2.replace("source 'https://github.com/CocoaPods/Specs.git'", "# source砍:本地:path依赖不需要")
+          c2 = c2.replace("source 'https://github.com/volcengine/volcengine-specs.git'", "# source砍:同上")
+          open(pf, 'w').write(c2)
+          print('Podfile已砍Geolocation-Tencent+外部specs')
           PY
-          # 显示名
-          plutil -replace CFBundleDisplayName -string "趣club" "$HB/HBuilder-Hello/Info.plist" 2>/dev/null || true
-          plutil -replace CFBundleName -string "趣club" "$HB/HBuilder-Hello/Info.plist" 2>/dev/null || true
+          # 共享scheme(demo不带xcshareddata;不手工建则xcodebuild自动scheme会编全部demo targets=3小时挂死根因)
+          mkdir -p "$HB/HBuilder-Hello.xcodeproj/xcshareddata/xcschemes"
+          cat > "$HB/HBuilder-Hello.xcodeproj/xcshareddata/xcschemes/HBuilder.xcscheme" <<'SCHEME'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <Scheme version = "1.3">
+             <BuildAction parallelizableBuildType = "YES" buildImplicitDependencies = "YES">
+                <BuildActionEntries>
+                   <BuildActionEntry buildForTesting = "YES" buildForRunning = "YES" buildForProfiling = "YES" buildForArchiving = "YES" buildForAnalyzing = "YES">
+                      <BuildableReference BuildableIdentifier = "primary" BlueprintIdentifier = "8EED6297198A1D13000A4449" BuildableName = "HBuilder.app" BlueprintName = "HBuilder" ReferencedContainer = "container:HBuilder-Hello.xcodeproj"></BuildableReference>
+                   </BuildActionEntry>
+                </BuildActionEntries>
+             </BuildAction>
+             <ArchiveAction buildConfiguration = "Release" revealArchiveInOrganizer = "YES"></ArchiveAction>
+          </Scheme>
+          SCHEME
+          # 显示名(demo的plist名是HBuilder-Hello-Info.plist)+本地化(不改会显示hbuilder你好)
+          plutil -replace CFBundleDisplayName -string "趣club" "$APP_ROOT/HBuilder-Hello-Info.plist"
+          plutil -replace CFBundleName -string "趣club" "$APP_ROOT/HBuilder-Hello-Info.plist"
+          printf 'CFBundleDisplayName="趣club";\n' > "$APP_ROOT/zh-Hans.lproj/InfoPlist.strings"
+          printf 'CFBundleDisplayName="趣club";\n' > "$APP_ROOT/en.lproj/InfoPlist.strings"
 
-      # ── 4. 签名材料 ──
+      # ── 4. 签名材料(双路径装profile, Xcode16起老目录废弃) ──
       - name: Import certificate & profile
         env:
           P12_B64: ${{ secrets.APPLE_P12_BASE64 }}
@@ -111,44 +127,42 @@ jobs:
           security list-keychain -d user -s build.keychain-db
           security set-key-partition-list -S apple-tool:,apple:,codesign: \
             -k temporary-build-keychain build.keychain-db
-          PP_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
-          mkdir -p "$PP_DIR"
           echo "$PROFILE_B64" | base64 --decode > "$RUNNER_TEMP/profile.mobileprovision"
           UUID=$(security cms -D -i "$RUNNER_TEMP/profile.mobileprovision" | plutil -extract UUID raw -o - -)
-          cp "$RUNNER_TEMP/profile.mobileprovision" "$PP_DIR/$UUID.mobileprovision"
-          echo "profile UUID=$UUID"
+          PP_OLD="$HOME/Library/MobileDevice/Provisioning Profiles"
+          PP_NEW="$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
+          mkdir -p "$PP_OLD" "$PP_NEW"
+          cp "$RUNNER_TEMP/profile.mobileprovision" "$PP_OLD/$UUID.mobileprovision"
+          cp "$RUNNER_TEMP/profile.mobileprovision" "$PP_NEW/$UUID.mobileprovision"
+          echo "PROFILE_UUID=$UUID" >> "$GITHUB_ENV"
+          echo "profile UUID=$UUID 已装双路径"
 
-      # ── 5. pod install + Pods禁签名 ──
+      # ── 5. pod install + post_install禁签名注入(本地:path依赖) ──
       - name: CocoaPods install
         working-directory: /tmp/sdk/out/SDK/HBuilder-Hello
         run: |
-          pod install
-      - name: Fix Pods signing (静态库不签名)
-        working-directory: /tmp/sdk/out/SDK/HBuilder-Hello
-        run: |
-          ruby -e "
-            require 'xcodeproj'
-            p = Xcodeproj::Project.open('Pods/Pods.xcodeproj')
-            p.targets.each do |t|
-              t.build_configurations.each do |c|
-                c.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
-                c.build_settings['CODE_SIGN_STYLE'] = 'Automatic'
-                c.build_settings['PROVISIONING_PROFILE_SPECIFIER'] = ''
-              end
+          python3 - <<'PY'
+          c = open('Podfile').read()
+          old = "post_install do |installer|\n  UniAppModuleConfig.apply("
+          new = """post_install do |installer|
+            installer.pods_project.build_configurations.each do |config|
+              config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
+              config.build_settings['CODE_SIGNING'] = 'NO'
             end
-            p.save
-            puts 'Pods signing fixed'
-          "
+            UniAppModuleConfig.apply("""
+          assert old in c, 'Podfile post_install锚点没找到'
+          open('Podfile','w').write(c.replace(old, new))
+          print('Podfile已注入禁签名')
+          PY
+          pod install
 
       # ── 6. Archive ──
       - name: Archive (AdHoc)
         env:
           BUILD_NUMBER: ${{ github.run_number }}
         run: |
-          set -o pipefail
           cd /tmp/sdk/out/SDK/HBuilder-Hello
-          xcodebuild -version; sysctl -n hw.ncpu; df -h / | tail -1
-          date '+%F %T archive start'
+          set -o pipefail
           xcodebuild archive \
             -workspace HBuilder-Hello.xcworkspace \
             -scheme HBuilder \
@@ -156,23 +170,24 @@ jobs:
             -destination 'generic/platform=iOS' \
             -archivePath "$RUNNER_TEMP/QuClub.xcarchive" \
             CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
-            MARKETING_VERSION=2.0.0 \
-            ENABLE_BITCODE=NO \
+            MARKETING_VERSION=2.1.0 \
             CODE_SIGN_STYLE=Manual \
-            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
+            PROVISIONING_PROFILE="$PROFILE_UUID" \
+            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_UUID" \
             CODE_SIGN_IDENTITY="Apple Distribution" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
-            2>&1 | tee "$RUNNER_TEMP/xcodebuild.log" | grep -E "error|warning: |ARCHIVE|==>" || true
-          date '+%F %T archive end'
+            > /tmp/archive.log 2>&1 || { echo '=== archive失败,最后80行 ==='; tail -80 /tmp/archive.log; exit 1; }
+          echo '=== archive结果 ==='; tail -5 /tmp/archive.log
           test -d "$RUNNER_TEMP/QuClub.xcarchive"
 
-      - name: Always upload build log
+      - name: Always upload archive log
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: xcodebuild-log-${{ github.run_number }}
-          path: ${{ runner.temp }}/xcodebuild.log
+          name: archive-log-${{ github.run_number }}
+          path: /tmp/archive.log
           retention-days: 7
+          if-no-files-found: ignore
 
       - name: Export IPA (ad-hoc)
         run: |
@@ -187,7 +202,7 @@ jobs:
             <key>teamID</key><string>${{ env.TEAM_ID }}</string>
             <key>provisioningProfiles</key>
             <dict>
-              <key>cn.qyai001.quclub</key><string>${{ env.PROFILE_NAME }}</string>
+              <key>cn.qyai001.quclub</key><string>${{ env.PROFILE_UUID }}</string>
             </dict>
           </dict>
           </plist>
@@ -195,7 +210,8 @@ jobs:
           xcodebuild -exportArchive \
             -archivePath "$RUNNER_TEMP/QuClub.xcarchive" \
             -exportPath "$RUNNER_TEMP/ipa" \
-            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist"
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            > /tmp/export.log 2>&1 || { echo '=== export失败,最后60行 ==='; tail -60 /tmp/export.log; exit 1; }
           ls -la "$RUNNER_TEMP/ipa"
 
       - name: Attach IPA artifact
@@ -204,3 +220,16 @@ jobs:
           name: quclub-native-ipa-${{ github.run_number }}
           path: ${{ runner.temp }}/ipa/*.ipa
           retention-days: 30
+
+      # 公开Release资产免认证直下(妹妹配方20260904)——PAT会被公开仓库安全扫描吊销,
+      # artifact API需认证;发Release后119直接curl下载部署,全程不依赖PAT
+      - name: Publish release (ipa免认证直下)
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v2.1.0-r${{ github.run_number }}"
+          gh release create "$TAG" "$RUNNER_TEMP/ipa/"*.ipa \
+            -R "$GITHUB_REPOSITORY" --title "QuClub $TAG" --latest \
+            --notes "v2.1.0 真原生离线打包(uni-app SDK 5.25):本地秒开;妹妹成熟配方v4" || echo 'release创建失败不阻塞artifact'
+          gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json assets --jq '.assets[].browser_download_url' || true
