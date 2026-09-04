@@ -1,4 +1,4 @@
-name: iOS Native Build (趣club v9.6:登录页居中修复成形版——修100%%笔误)
+name: iOS Native Build (趣club v9.7:Podfile启用Video模块=修资料页视频报错)
 
 on:
   workflow_dispatch:
@@ -84,7 +84,7 @@ jobs:
           <?xml version="1.0" encoding="utf-8"?>
           <HBuilder debug="false" version="5.25.2026082902">
             <apps>
-              <app appid="$APPID" appver="2.1.6" appkey="$APPKEY"/>
+              <app appid="$APPID" appver="2.1.7" appkey="$APPKEY"/>
             </apps>
           </HBuilder>
           XML
@@ -101,8 +101,11 @@ jobs:
           c2 = c2.replace("   'Geolocation-Tencent',", "   # 'Geolocation-Tencent', # 砍:UTS插件Xcode16.4链接符号不匹配;坐标走系统核心定位,地址走后端/ws/geocoder逆地理")
           c2 = c2.replace("source 'https://github.com/CocoaPods/Specs.git'", "# source砍:本地:path依赖不需要")
           c2 = c2.replace("source 'https://github.com/volcengine/volcengine-specs.git'", "# source砍:同上")
+          # v2.1.7: 启用Video模块——SDK默认注释着,资料页<video>组件在真机弹"打包时未添加VideoPlayer模块"(张总20260905截图实锤)
+          assert "#   'Video'," in c2, 'Video注释锚点没找到'
+          c2 = c2.replace("#   'Video',", "   'Video',")
           open(pf, 'w').write(c2)
-          print('Podfile已砍Geolocation-Tencent+外部specs')
+          print('Podfile已砍Geolocation-Tencent+外部specs+启用Video')
           PY
           # 共享scheme(demo不带xcshareddata;不手工建则xcodebuild自动scheme会编全部demo targets=3小时挂死根因)
           mkdir -p "$HB/HBuilder-Hello.xcodeproj/xcshareddata/xcschemes"
@@ -219,7 +222,7 @@ jobs:
             -destination 'generic/platform=iOS' \
             -archivePath "$RUNNER_TEMP/QuClub.xcarchive" \
             CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
-            MARKETING_VERSION=2.1.6 \
+            MARKETING_VERSION=2.1.7 \
             CODE_SIGN_STYLE=Manual \
             PROVISIONING_PROFILE="$PROFILE_UUID" \
             PROVISIONING_PROFILE_SPECIFIER="$PROFILE_UUID" \
@@ -291,8 +294,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="v2.1.6-r${{ github.run_number }}"
+          TAG="v2.1.7-r${{ github.run_number }}"
           gh release create "$TAG" "$RUNNER_TEMP/ipa/"*.ipa \
             -R "$GITHUB_REPOSITORY" --title "QuClub $TAG" --latest \
-            --notes "v2.1.6:登录页族居中修复成形,100%笔误已修正" || echo 'release创建失败不阻塞artifact'
+            --notes "v2.1.7: Podfile启用Video模块——修资料详情页视频区弹打包时未添加VideoPlayer模块" || echo 'release创建失败不阻塞artifact'
           gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json assets --jq '.assets[].browser_download_url' || true
