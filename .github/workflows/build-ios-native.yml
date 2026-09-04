@@ -294,5 +294,5 @@ jobs:
           TAG="v2.1.6-r${{ github.run_number }}"
           gh release create "$TAG" "$RUNNER_TEMP/ipa/"*.ipa \
             -R "$GITHUB_REPOSITORY" --title "QuClub $TAG" --latest \
-            --notes "v2.1.6:登录页族居中修复成形(v2.1.5的100%笔误致page高度规则被CSS压缩器丢弃,本版修正) || echo 'release创建失败不阻塞artifact'
+            --notes "v2.1.6:登录页族居中修复成形,100%笔误已修正" || echo 'release创建失败不阻塞artifact'
           gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json assets --jq '.assets[].browser_download_url' || true
