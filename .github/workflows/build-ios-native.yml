@@ -1,4 +1,4 @@
-name: iOS Native Build (趣club v9.7:Podfile启用Video模块=修资料页视频报错)
+name: iOS Native Build (趣club v9.8:三路审计批量修复终版)
 
 on:
   workflow_dispatch:
@@ -84,7 +84,7 @@ jobs:
           <?xml version="1.0" encoding="utf-8"?>
           <HBuilder debug="false" version="5.25.2026082902">
             <apps>
-              <app appid="$APPID" appver="2.1.7" appkey="$APPKEY"/>
+              <app appid="$APPID" appver="2.1.8" appkey="$APPKEY"/>
             </apps>
           </HBuilder>
           XML
@@ -222,7 +222,7 @@ jobs:
             -destination 'generic/platform=iOS' \
             -archivePath "$RUNNER_TEMP/QuClub.xcarchive" \
             CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
-            MARKETING_VERSION=2.1.7 \
+            MARKETING_VERSION=2.1.8 \
             CODE_SIGN_STYLE=Manual \
             PROVISIONING_PROFILE="$PROFILE_UUID" \
             PROVISIONING_PROFILE_SPECIFIER="$PROFILE_UUID" \
@@ -294,8 +294,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="v2.1.7-r${{ github.run_number }}"
+          TAG="v2.1.8-r${{ github.run_number }}"
           gh release create "$TAG" "$RUNNER_TEMP/ipa/"*.ipa \
             -R "$GITHUB_REPOSITORY" --title "QuClub $TAG" --latest \
-            --notes "v2.1.7: Podfile启用Video模块——修资料详情页视频区弹打包时未添加VideoPlayer模块" || echo 'release创建失败不阻塞artifact'
+            --notes "v2.1.8:三路审计批量修复——消息tab白屏真凶(getMenuButtonBoundingClientRect)+发单页map模块弹错(APP改静态占位)+全局高度链(12页结算底栏)+死代码守卫族;含Video模块启用" || echo 'release创建失败不阻塞artifact'
           gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json assets --jq '.assets[].browser_download_url' || true
