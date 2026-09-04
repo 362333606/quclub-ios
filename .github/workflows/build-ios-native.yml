@@ -1,4 +1,4 @@
-name: iOS Native Build (趣club v9.5:修登录页族APP高度链断裂偏顶)
+name: iOS Native Build (趣club v9.6:登录页居中修复成形版——修100%%笔误)
 
 on:
   workflow_dispatch:
@@ -84,7 +84,7 @@ jobs:
           <?xml version="1.0" encoding="utf-8"?>
           <HBuilder debug="false" version="5.25.2026082902">
             <apps>
-              <app appid="$APPID" appver="2.1.5" appkey="$APPKEY"/>
+              <app appid="$APPID" appver="2.1.6" appkey="$APPKEY"/>
             </apps>
           </HBuilder>
           XML
@@ -219,7 +219,7 @@ jobs:
             -destination 'generic/platform=iOS' \
             -archivePath "$RUNNER_TEMP/QuClub.xcarchive" \
             CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
-            MARKETING_VERSION=2.1.5 \
+            MARKETING_VERSION=2.1.6 \
             CODE_SIGN_STYLE=Manual \
             PROVISIONING_PROFILE="$PROFILE_UUID" \
             PROVISIONING_PROFILE_SPECIFIER="$PROFILE_UUID" \
@@ -291,8 +291,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="v2.1.5-r${{ github.run_number }}"
+          TAG="v2.1.6-r${{ github.run_number }}"
           gh release create "$TAG" "$RUNNER_TEMP/ipa/"*.ipa \
             -R "$GITHUB_REPOSITORY" --title "QuClub $TAG" --latest \
-            --notes "v2.1.5:修登录/注册/找回/绑定手机四页在APP上内容全部偏顶不居中——uni-page高度链断裂,补page高度+100vh" || echo 'release创建失败不阻塞artifact'
+            --notes "v2.1.6:登录页族居中修复成形(v2.1.5的100%笔误致page高度规则被CSS压缩器丢弃,本版修正) || echo 'release创建失败不阻塞artifact'
           gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json assets --jq '.assets[].browser_download_url' || true
