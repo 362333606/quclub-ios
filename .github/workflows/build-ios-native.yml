@@ -1,4 +1,4 @@
-name: iOS Native Build (趣club v9.8:三路审计批量修复终版)
+name: iOS Native Build (趣club v2.1.9:wgt热更新机制)
 
 on:
   workflow_dispatch:
@@ -84,7 +84,7 @@ jobs:
           <?xml version="1.0" encoding="utf-8"?>
           <HBuilder debug="false" version="5.25.2026082902">
             <apps>
-              <app appid="$APPID" appver="2.1.8" appkey="$APPKEY"/>
+              <app appid="$APPID" appver="2.1.9" appkey="$APPKEY"/>
             </apps>
           </HBuilder>
           XML
@@ -164,6 +164,17 @@ jobs:
           printf 'CFBundleDisplayName="趣club";\n' > "$APP_ROOT/zh-Hans.lproj/InfoPlist.strings"
           printf 'CFBundleDisplayName="趣club";\n' > "$APP_ROOT/en.lproj/InfoPlist.strings"
 
+      # ── 3.5 wgt热更新包(www打包成zip根含manifest.json,与IPA内www完全一致) ──
+      - name: Package wgt (热更新包)
+        run: |
+          APP_DIR="/tmp/sdk/out/SDK/HBuilder-Hello/HBuilder-Hello/Pandora/apps/$APPID"
+          test -f "$APP_DIR/www/manifest.json" || { echo 'FATAL: www/manifest.json不存在'; exit 1; }
+          python3 -c "import json;m=json.load(open('$APP_DIR/www/manifest.json'));print('wgt manifest version:',m['version'])"
+          cd "$APP_DIR/www" && rm -f "$RUNNER_TEMP/quclub.wgt" && zip -rq "$RUNNER_TEMP/quclub.wgt" .
+          test -f "$RUNNER_TEMP/quclub.wgt" || { echo 'FATAL: wgt打包失败'; exit 1; }
+          unzip -l "$RUNNER_TEMP/quclub.wgt" | grep -E "manifest.json|app-service.js" || { echo 'FATAL: wgt缺关键文件'; exit 1; }
+          ls -la "$RUNNER_TEMP/quclub.wgt"
+
       # ── 4. 签名材料(双路径装profile, Xcode16起老目录废弃) ──
       - name: Import certificate & profile
         env:
@@ -222,7 +233,7 @@ jobs:
             -destination 'generic/platform=iOS' \
             -archivePath "$RUNNER_TEMP/QuClub.xcarchive" \
             CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
-            MARKETING_VERSION=2.1.8 \
+            MARKETING_VERSION=2.1.9 \
             CODE_SIGN_STYLE=Manual \
             PROVISIONING_PROFILE="$PROFILE_UUID" \
             PROVISIONING_PROFILE_SPECIFIER="$PROFILE_UUID" \
@@ -284,7 +295,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: quclub-native-ipa-${{ github.run_number }}
-          path: ${{ runner.temp }}/ipa/*.ipa
+          path: |
+            ${{ runner.temp }}/ipa/*.ipa
+            ${{ runner.temp }}/quclub.wgt
           retention-days: 30
 
       # 公开Release资产免认证直下(妹妹配方20260904)——PAT会被公开仓库安全扫描吊销,
@@ -294,8 +307,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="v2.1.8-r${{ github.run_number }}"
-          gh release create "$TAG" "$RUNNER_TEMP/ipa/"*.ipa \
+          TAG="v2.1.9-r${{ github.run_number }}"
+          gh release create "$TAG" "$RUNNER_TEMP/ipa/"*.ipa "$RUNNER_TEMP/quclub.wgt" \
             -R "$GITHUB_REPOSITORY" --title "QuClub $TAG" --latest \
-            --notes "v2.1.8:三路审计批量修复——消息tab白屏真凶(getMenuButtonBoundingClientRect)+发单页map模块弹错(APP改静态占位)+全局高度链(12页结算底栏)+死代码守卫族;含Video模块启用" || echo 'release创建失败不阻塞artifact'
+            --notes "v2.1.9:修复登录页报错等6项——reg/findPassword倒计时clearInterval未定义变量+getBestList防御+逆地理判空+下载链接换vipk域名+聊天页防缓存&v=219;新增wgt热更新机制(version.json比对,首包versionCode=219)" || echo 'release创建失败不阻塞artifact'
           gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json assets --jq '.assets[].browser_download_url' || true
