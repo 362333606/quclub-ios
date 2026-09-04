@@ -1,4 +1,4 @@
-name: iOS Native Build (趣club v6:CI编www对齐5.25+图标注入)
+name: iOS Native Build (趣club v9:纯logo图标+启动图替换+关沉浸+平台API守卫)
 
 on:
   workflow_dispatch:
@@ -84,7 +84,7 @@ jobs:
           <?xml version="1.0" encoding="utf-8"?>
           <HBuilder debug="false" version="5.25.2026082902">
             <apps>
-              <app appid="$APPID" appver="2.1.1" appkey="$APPKEY"/>
+              <app appid="$APPID" appver="2.1.2" appkey="$APPKEY"/>
             </apps>
           </HBuilder>
           XML
@@ -121,6 +121,7 @@ jobs:
           SCHEME
           # App图标(demo的AppIcon.appiconset是空目录=空白logo根因;注入v1.0.2同款品牌图标)
           # 图标:注入pbxproj实际引用的HBuilder/Images.xcassets(v7注错目录致无Assets.car)+HBuilder-Hello/双保险
+          # v9(2026-09-04): ios-shell/icon1024.png已换成纯趣club logo满幅图(去掉紫色合成底),同时注入LaunchLogo启动图用
           for XC in "$HB/HBuilder/Images.xcassets" "$HB/HBuilder-Hello/Images.xcassets"; do
             ICONSET="$XC/AppIcon.appiconset"
             mkdir -p "$ICONSET"
@@ -131,7 +132,66 @@ jobs:
             "info" : { "author" : "xcode", "version" : 1 }
           }
           JSON
+            LOGOSET="$XC/LaunchLogo.imageset"
+            mkdir -p "$LOGOSET"
+            cp "$GITHUB_WORKSPACE/ios-shell/icon1024.png" "$LOGOSET/launchlogo.png"
+            cat > "$LOGOSET/Contents.json" <<'JSON'
+          {
+            "images" : [ { "filename" : "launchlogo.png", "idiom" : "universal", "scale" : "1x" }, { "idiom" : "universal", "scale" : "2x" }, { "idiom" : "universal", "scale" : "3x" } ],
+            "info" : { "author" : "xcode", "version" : 1 }
+          }
+          JSON
           done
+          # 启动图(v9):SDK默认LaunchScreen.storyboard=dclogo+「HBuilder Hello」文字闪屏1秒,替换为白底+居中LaunchLogo
+          cat > "$APP_ROOT/LaunchScreen.storyboard" <<'SB'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="16096" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" colorMatched="YES" initialViewController="01J-lp-oVM">
+              <device id="retina4_7" orientation="portrait" appearance="light"/>
+              <dependencies>
+                  <deployment identifier="iOS"/>
+                  <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="16087"/>
+                  <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
+              </dependencies>
+              <scenes>
+                  <!--View Controller-->
+                  <scene sceneID="EHf-IW-A2E">
+                      <objects>
+                          <viewController id="01J-lp-oVM" sceneMemberID="viewController">
+                              <layoutGuides>
+                                  <viewControllerLayoutGuide type="top" id="aN7-qZ-KCL"/>
+                                  <viewControllerLayoutGuide type="bottom" id="5o6-IB-QEo"/>
+                              </layoutGuides>
+                              <view key="view" contentMode="scaleToFill" id="z0m-pv-cfa">
+                                  <rect key="frame" x="0.0" y="0.0" width="375" height="667"/>
+                                  <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                  <subviews>
+                                      <imageView userInteractionEnabled="NO" contentMode="scaleAspectFit" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="LaunchLogo" translatesAutoresizingMaskIntoConstraints="NO" id="chI-mp-JJn">
+                                          <rect key="frame" x="87.5" y="233.5" width="200" height="200"/>
+                                          <constraints>
+                                              <constraint firstAttribute="width" constant="200" id="qC1-Lg-9Xa"/>
+                                              <constraint firstAttribute="height" constant="200" id="qC2-Lg-9Xb"/>
+                                          </constraints>
+                                      </imageView>
+                                  </subviews>
+                                  <color key="backgroundColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                                  <constraints>
+                                      <constraint firstItem="chI-mp-JJn" firstAttribute="centerX" secondItem="z0m-pv-cfa" secondAttribute="centerX" id="xC1-Lg-9Xc"/>
+                                      <constraint firstItem="chI-mp-JJn" firstAttribute="centerY" secondItem="z0m-pv-cfa" secondAttribute="centerY" id="xC2-Lg-9Xd"/>
+                                  </constraints>
+                              </view>
+                          </viewController>
+                          <placeholder placeholderIdentifier="iYj-Kq-Ea1" userLabel="First Responder" sceneMemberID="firstResponder"/>
+                      </objects>
+                      <point key="canvasLocation" x="-359" y="240"/>
+                  </scene>
+              </scenes>
+              <resources>
+                  <image name="LaunchLogo" width="200" height="200"/>
+              </resources>
+          </document>
+          SB
+          cp "$APP_ROOT/LaunchScreen.storyboard" "$APP_ROOT/Base.lproj/LaunchScreen.storyboard"
+          grep -c 'HBuilder Hello' "$APP_ROOT/LaunchScreen.storyboard" || echo '启动图已替换:不含HBuilder Hello'
           # 显示名(demo的plist名是HBuilder-Hello-Info.plist)+本地化(不改会显示hbuilder你好)
           plutil -replace CFBundleDisplayName -string "趣club" "$APP_ROOT/HBuilder-Hello-Info.plist"
           plutil -replace CFBundleName -string "趣club" "$APP_ROOT/HBuilder-Hello-Info.plist"
@@ -196,7 +256,7 @@ jobs:
             -destination 'generic/platform=iOS' \
             -archivePath "$RUNNER_TEMP/QuClub.xcarchive" \
             CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
-            MARKETING_VERSION=2.1.1 \
+            MARKETING_VERSION=2.1.2 \
             CODE_SIGN_STYLE=Manual \
             PROVISIONING_PROFILE="$PROFILE_UUID" \
             PROVISIONING_PROFILE_SPECIFIER="$PROFILE_UUID" \
@@ -240,6 +300,20 @@ jobs:
             > /tmp/export.log 2>&1 || { echo '=== export失败,最后60行 ==='; tail -60 /tmp/export.log; exit 1; }
           ls -la "$RUNNER_TEMP/ipa"
 
+      - name: Verify IPA (图标+启动图硬校验,v7教训)
+        run: |
+          IPA=$(ls "$RUNNER_TEMP/ipa/"*.ipa)
+          unzip -l "$IPA" | grep -E "Assets\.car|LaunchScreen" || { echo 'FATAL: 缺Assets.car或LaunchScreen'; exit 1; }
+          rm -rf /tmp/ipax && mkdir /tmp/ipax && unzip -q "$IPA" -d /tmp/ipax
+          APP=$(ls -d /tmp/ipax/Payload/*.app)
+          test -f "$APP/Assets.car" || { echo 'FATAL: Assets.car不存在'; exit 1; }
+          SB=$(find "$APP" -name 'LaunchScreen.storyboardc' | head -1)
+          echo "storyboardc: $SB"
+          if strings "$SB" 2>/dev/null | grep -q 'HBuilder Hello'; then
+            echo 'FATAL: 启动图仍含HBuilder Hello'; exit 1
+          fi
+          echo 'IPA校验通过: Assets.car在+启动图已净化'
+
       - name: Attach IPA artifact
         uses: actions/upload-artifact@v4
         with:
@@ -254,8 +328,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="v2.1.1-r${{ github.run_number }}"
+          TAG="v2.1.2-r${{ github.run_number }}"
           gh release create "$TAG" "$RUNNER_TEMP/ipa/"*.ipa \
             -R "$GITHUB_REPOSITORY" --title "QuClub $TAG" --latest \
-            --notes "v2.1.0 真原生离线打包(uni-app SDK 5.25):本地秒开;妹妹成熟配方v4" || echo 'release创建失败不阻塞artifact'
+            --notes "v2.1.2:纯趣club logo图标/替换HBuilder Hello启动图/关闭沉浸式状态栏(修顶栏顶到电池)/全站window API加APP守卫(修页面点不进)" || echo 'release创建失败不阻塞artifact'
           gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json assets --jq '.assets[].browser_download_url' || true
