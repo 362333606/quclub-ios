@@ -1,4 +1,4 @@
-name: iOS Native Build (趣club v2.1.9:wgt热更新机制)
+name: iOS Native Build (趣club v2.1.10:wgt热更新机制)
 
 on:
   workflow_dispatch:
@@ -84,7 +84,7 @@ jobs:
           <?xml version="1.0" encoding="utf-8"?>
           <HBuilder debug="false" version="5.25.2026082902">
             <apps>
-              <app appid="$APPID" appver="2.1.9" appkey="$APPKEY"/>
+              <app appid="$APPID" appver="2.1.10" appkey="$APPKEY"/>
             </apps>
           </HBuilder>
           XML
@@ -233,7 +233,7 @@ jobs:
             -destination 'generic/platform=iOS' \
             -archivePath "$RUNNER_TEMP/QuClub.xcarchive" \
             CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
-            MARKETING_VERSION=2.1.9 \
+            MARKETING_VERSION=2.1.10 \
             CODE_SIGN_STYLE=Manual \
             PROVISIONING_PROFILE="$PROFILE_UUID" \
             PROVISIONING_PROFILE_SPECIFIER="$PROFILE_UUID" \
@@ -307,8 +307,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="v2.1.9-r${{ github.run_number }}"
+          TAG="v2.1.10-r${{ github.run_number }}"
           gh release create "$TAG" "$RUNNER_TEMP/ipa/"*.ipa "$RUNNER_TEMP/quclub.wgt" \
             -R "$GITHUB_REPOSITORY" --title "QuClub $TAG" --latest \
-            --notes "v2.1.9:修复登录页报错等6项——reg/findPassword倒计时clearInterval未定义变量+getBestList防御+逆地理判空+下载链接换vipk域名+聊天页防缓存&v=219;新增wgt热更新机制(version.json比对,首包versionCode=219)" || echo 'release创建失败不阻塞artifact'
+            --notes "v2.1.10:聊天页回滚稳定版+未登录状态修复——webview缓存参数&v=220;wgt热更新第二版(versionCode=220,设备2.1.9/219启动即提示热更)" || echo 'release创建失败不阻塞artifact'
           gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json assets --jq '.assets[].browser_download_url' || true
