@@ -77,6 +77,9 @@ jobs:
           mkdir -p "$APP_DIR/www"
           cp -R app/dist/build/app-plus/. "$APP_DIR/www/"
           test -f "$APP_DIR/www/manifest.json" || { echo www拷贝失败; exit 1; }
+          # www内appid对齐$APPID(源工程manifest自带9CDF755)
+          sed -i.bak "s|\"__UNI__[A-Z0-9]*\"|\"$APPID\"|g" "$APP_DIR/www/manifest.json" && rm -f "$APP_DIR/www/manifest.json.bak"
+          grep -o "\"__UNI__[A-Z0-9]*\"" "$APP_DIR/www/manifest.json" | head -1
           cat > "$APP_ROOT/control.xml" <<XML
           <?xml version="1.0" encoding="utf-8"?>
           <HBuilder debug="false" version="5.25.2026082902">
@@ -117,15 +120,18 @@ jobs:
           </Scheme>
           SCHEME
           # App图标(demo的AppIcon.appiconset是空目录=空白logo根因;注入v1.0.2同款品牌图标)
-          ICONSET="$HB/HBuilder-Hello/Images.xcassets/AppIcon.appiconset"
-          mkdir -p "$ICONSET"
-          cp ios-shell/icon1024.png "$ICONSET/icon1024.png"
-          cat > "$ICONSET/Contents.json" <<'JSON'
+          # 图标:注入pbxproj实际引用的HBuilder/Images.xcassets(v7注错目录致无Assets.car)+HBuilder-Hello/双保险
+          for XC in "$HB/HBuilder/Images.xcassets" "$HB/HBuilder-Hello/Images.xcassets"; do
+            ICONSET="$XC/AppIcon.appiconset"
+            mkdir -p "$ICONSET"
+            cp "$GITHUB_WORKSPACE/ios-shell/icon1024.png" "$ICONSET/icon1024.png"
+            cat > "$ICONSET/Contents.json" <<'JSON'
           {
             "images" : [ { "filename" : "icon1024.png", "idiom" : "universal", "platform" : "ios", "size" : "1024x1024" } ],
             "info" : { "author" : "xcode", "version" : 1 }
           }
           JSON
+          done
           # 显示名(demo的plist名是HBuilder-Hello-Info.plist)+本地化(不改会显示hbuilder你好)
           plutil -replace CFBundleDisplayName -string "趣club" "$APP_ROOT/HBuilder-Hello-Info.plist"
           plutil -replace CFBundleName -string "趣club" "$APP_ROOT/HBuilder-Hello-Info.plist"
