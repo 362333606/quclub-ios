@@ -1,4 +1,4 @@
-name: iOS Native Build (趣club uni-app离线打包·v4妹妹成熟配方)
+name: iOS Native Build (趣club v6:CI编www对齐5.25+图标注入)
 
 on:
   workflow_dispatch:
@@ -21,11 +21,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # ── 1. www 资源(仓库内已编好的 app-plus 产物,9-4与本地build同版本2.1.0) ──
-      - name: Check www
+      # ── 1. CI内编译www(编译器50205线对齐SDK5.25,修5.24/5.25不匹配白屏+弹窗) ──
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '16'
+      - name: Extract app source
         run: |
-          test -f www/app-service.js && test -f www/manifest.json
-          ls www/ | head -10
+          mkdir -p app && tar xzf app-src.tar.gz -C app
+          ls app/ | head -8
+          test -f app/package.json
+      - name: Build uni-app www
+        working-directory: app
+        run: |
+          npm install --legacy-peer-deps --no-audit --no-fund
+          rm -rf node_modules/@vue/component-compiler-utils
+          cp -r node_modules/@dcloudio/vue-cli-plugin-uni/packages/@vue/component-compiler-utils node_modules/@vue/component-compiler-utils
+          npm run build:app-plus
+          test -f dist/build/app-plus/app-service.js
 
       # ── 2. 下载 iOS 离线 SDK (Release 资产, 带缓存) ──
       - name: Cache iOS SDK zip
@@ -63,13 +75,13 @@ jobs:
           APP_DIR="$APP_ROOT/Pandora/apps/$APPID"
           rm -rf "$APP_ROOT/Pandora/apps/"*/
           mkdir -p "$APP_DIR/www"
-          cp -R www/. "$APP_DIR/www/"
+          cp -R app/dist/build/app-plus/. "$APP_DIR/www/"
           test -f "$APP_DIR/www/manifest.json" || { echo www拷贝失败; exit 1; }
           cat > "$APP_ROOT/control.xml" <<XML
           <?xml version="1.0" encoding="utf-8"?>
           <HBuilder debug="false" version="5.25.2026082902">
             <apps>
-              <app appid="$APPID" appver="2.1.0" appkey="$APPKEY"/>
+              <app appid="$APPID" appver="2.1.1" appkey="$APPKEY"/>
             </apps>
           </HBuilder>
           XML
@@ -104,6 +116,15 @@ jobs:
              <ArchiveAction buildConfiguration = "Release" revealArchiveInOrganizer = "YES"></ArchiveAction>
           </Scheme>
           SCHEME
+          # App图标(demo的AppIcon.appiconset是空目录=空白logo根因;注入v1.0.2同款品牌图标)
+          ICONSET="$HB/HBuilder-Hello/Images.xcassets/AppIcon.appiconset"
+          cp ios-shell/icon1024.png "$ICONSET/icon1024.png"
+          cat > "$ICONSET/Contents.json" <<'JSON'
+          {
+            "images" : [ { "filename" : "icon1024.png", "idiom" : "universal", "platform" : "ios", "size" : "1024x1024" } ],
+            "info" : { "author" : "xcode", "version" : 1 }
+          }
+          JSON
           # 显示名(demo的plist名是HBuilder-Hello-Info.plist)+本地化(不改会显示hbuilder你好)
           plutil -replace CFBundleDisplayName -string "趣club" "$APP_ROOT/HBuilder-Hello-Info.plist"
           plutil -replace CFBundleName -string "趣club" "$APP_ROOT/HBuilder-Hello-Info.plist"
@@ -168,7 +189,7 @@ jobs:
             -destination 'generic/platform=iOS' \
             -archivePath "$RUNNER_TEMP/QuClub.xcarchive" \
             CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
-            MARKETING_VERSION=2.1.0 \
+            MARKETING_VERSION=2.1.1 \
             CODE_SIGN_STYLE=Manual \
             PROVISIONING_PROFILE="$PROFILE_UUID" \
             PROVISIONING_PROFILE_SPECIFIER="$PROFILE_UUID" \
@@ -226,7 +247,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="v2.1.0-r${{ github.run_number }}"
+          TAG="v2.1.1-r${{ github.run_number }}"
           gh release create "$TAG" "$RUNNER_TEMP/ipa/"*.ipa \
             -R "$GITHUB_REPOSITORY" --title "QuClub $TAG" --latest \
             --notes "v2.1.0 真原生离线打包(uni-app SDK 5.25):本地秒开;妹妹成熟配方v4" || echo 'release创建失败不阻塞artifact'
