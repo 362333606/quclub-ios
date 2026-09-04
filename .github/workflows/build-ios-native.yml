@@ -132,66 +132,28 @@ jobs:
             "info" : { "author" : "xcode", "version" : 1 }
           }
           JSON
-            LOGOSET="$XC/LaunchLogo.imageset"
-            mkdir -p "$LOGOSET"
-            cp "$GITHUB_WORKSPACE/ios-shell/icon1024.png" "$LOGOSET/launchlogo.png"
-            cat > "$LOGOSET/Contents.json" <<'JSON'
-          {
-            "images" : [ { "filename" : "launchlogo.png", "idiom" : "universal", "scale" : "1x" }, { "idiom" : "universal", "scale" : "2x" }, { "idiom" : "universal", "scale" : "3x" } ],
-            "info" : { "author" : "xcode", "version" : 1 }
-          }
-          JSON
           done
-          # 启动图(v9):SDK默认LaunchScreen.storyboard=dclogo+「HBuilder Hello」文字闪屏1秒,替换为白底+居中LaunchLogo
-          cat > "$APP_ROOT/LaunchScreen.storyboard" <<'SB'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="16096" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" colorMatched="YES" initialViewController="01J-lp-oVM">
-              <device id="retina4_7" orientation="portrait" appearance="light"/>
-              <dependencies>
-                  <deployment identifier="iOS"/>
-                  <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="16087"/>
-                  <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
-              </dependencies>
-              <scenes>
-                  <!--View Controller-->
-                  <scene sceneID="EHf-IW-A2E">
-                      <objects>
-                          <viewController id="01J-lp-oVM" sceneMemberID="viewController">
-                              <layoutGuides>
-                                  <viewControllerLayoutGuide type="top" id="aN7-qZ-KCL"/>
-                                  <viewControllerLayoutGuide type="bottom" id="5o6-IB-QEo"/>
-                              </layoutGuides>
-                              <view key="view" contentMode="scaleToFill" id="z0m-pv-cfa">
-                                  <rect key="frame" x="0.0" y="0.0" width="375" height="667"/>
-                                  <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
-                                  <subviews>
-                                      <imageView userInteractionEnabled="NO" contentMode="scaleAspectFit" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="LaunchLogo" translatesAutoresizingMaskIntoConstraints="NO" id="chI-mp-JJn">
-                                          <rect key="frame" x="87.5" y="233.5" width="200" height="200"/>
-                                          <constraints>
-                                              <constraint firstAttribute="width" constant="200" id="qC1-Lg-9Xa"/>
-                                              <constraint firstAttribute="height" constant="200" id="qC2-Lg-9Xb"/>
-                                          </constraints>
-                                      </imageView>
-                                  </subviews>
-                                  <color key="backgroundColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
-                                  <constraints>
-                                      <constraint firstItem="chI-mp-JJn" firstAttribute="centerX" secondItem="z0m-pv-cfa" secondAttribute="centerX" id="xC1-Lg-9Xc"/>
-                                      <constraint firstItem="chI-mp-JJn" firstAttribute="centerY" secondItem="z0m-pv-cfa" secondAttribute="centerY" id="xC2-Lg-9Xd"/>
-                                  </constraints>
-                              </view>
-                          </viewController>
-                          <placeholder placeholderIdentifier="iYj-Kq-Ea1" userLabel="First Responder" sceneMemberID="firstResponder"/>
-                      </objects>
-                      <point key="canvasLocation" x="-359" y="240"/>
-                  </scene>
-              </scenes>
-              <resources>
-                  <image name="LaunchLogo" width="200" height="200"/>
-              </resources>
-          </document>
-          SB
-          cp "$APP_ROOT/LaunchScreen.storyboard" "$APP_ROOT/Base.lproj/LaunchScreen.storyboard"
-          grep -c 'HBuilder Hello' "$APP_ROOT/LaunchScreen.storyboard" || echo '启动图已替换:不含HBuilder Hello'
+          # 启动图净化(v9.1外科手术): 删「HBuilder Hello」标签+其约束,覆盖dclogo/app图片为品牌logo,logo垂直居中
+          # (v9整文件替换storyboard导致ibtool CompileStoryboard失败;改为对原XML做最小文本手术,结构零改动)
+          python3 - <<'PY'
+          import re
+          sbs = [
+              '/tmp/sdk/out/SDK/HBuilder-Hello/HBuilder-Hello/LaunchScreen.storyboard',
+              '/tmp/sdk/out/SDK/HBuilder-Hello/HBuilder-Hello/Base.lproj/LaunchScreen.storyboard',
+          ]
+          for sb in sbs:
+              c = open(sb).read()
+              c2 = re.sub(r'<label[^>]*text="HBuilder Hello".*?</label>\s*', '', c, flags=re.S)
+              c2 = re.sub(r'<constraint[^>]*"(?:firstItem|secondItem)="lAp-n0-0hk"[^>]*/>\s*', '', c2)
+              c2 = c2.replace('constant="100"', 'constant="293"')  # logo从顶部下移到垂直居中(667设计高,81pt图)
+              open(sb, 'w').write(c2)
+              print(sb, '净化后含HBuilder Hello:', 'HBuilder Hello' in c2)
+          PY
+          # 覆盖启动图用的小图(dclogo=根storyboard引用 / app=Base.lproj引用),243px品牌logo,显示81pt清晰
+          for IMG in dclogo.png dclogo@2x.png dclogo@3x.png app.png; do
+            cp "$GITHUB_WORKSPACE/ios-shell/launchlogo243.png" "$APP_ROOT/$IMG"
+          done
+          echo '启动图处理完成'
           # 显示名(demo的plist名是HBuilder-Hello-Info.plist)+本地化(不改会显示hbuilder你好)
           plutil -replace CFBundleDisplayName -string "趣club" "$APP_ROOT/HBuilder-Hello-Info.plist"
           plutil -replace CFBundleName -string "趣club" "$APP_ROOT/HBuilder-Hello-Info.plist"
