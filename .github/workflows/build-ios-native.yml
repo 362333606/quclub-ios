@@ -14,6 +14,8 @@ jobs:
   build:
     name: 离线打包 AdHoc
     runs-on: macos-15
+    permissions:
+      contents: write   # Publish release步骤需要(job默认token只读)
     timeout-minutes: 150
     steps:
       - name: Checkout
@@ -42,20 +44,16 @@ jobs:
       - name: Unzip & verify iOS SDK
         run: |
           mkdir -p /tmp/sdk && cd /tmp/sdk
-          unzip -q /tmp/iOS-SDK.zip -d out   # 净版: 根目录是 SDK/
+          unzip -q /tmp/iOS-SDK.zip -d out || true   # 净版: 根目录是 SDK/ (__MACOSX杂质会致warning退出码,容忍)
           ls out/SDK/ | head
-          # 强校验:解压报成功但内容为空(zip64坑)立即中止
-          python3 - <<'PY'
-          import os, sys
-          need = ['SDK/uniapp.podspec', 'SDK/HBuilder-Hello/Podfile', 'SDK/HBuilder-Hello/HBuilder-Hello/control.xml']
-          base = '/tmp/sdk/out'
-          missing = [n for n in need if not os.path.exists(os.path.join(base, n))]
-          total = sum(sum(f.st_size for f in fs) for _,_,fs in os.walk(base))
-          print(f'展开总:{total/1048576:.0f}MB missing={missing}')
-          if missing or total < 1_500_000_000:
-              print('FATAL: SDK解压校验失败'); sys.exit(1)
-          print('SDK校验通过')
-          PY
+          # 强校验(纯bash): 关键文件在+体积够(zip64空壳坑)
+          test -f out/SDK/uniapp.podspec || { echo 'FATAL: 缺uniapp.podspec'; exit 1; }
+          test -f out/SDK/HBuilder-Hello/Podfile || { echo 'FATAL: 缺Podfile'; exit 1; }
+          test -f out/SDK/HBuilder-Hello/HBuilder-Hello/control.xml || { echo 'FATAL: 缺control.xml'; exit 1; }
+          SDK_MB=$(du -sm out/ | cut -f1)
+          echo "SDK展开 ${SDK_MB}MB"
+          [ "$SDK_MB" -gt 1400 ] || { echo 'FATAL: SDK体积异常'; exit 1; }
+          echo 'SDK校验通过'
 
       # ── 3. 组装: www + control.xml + bundle id + scheme (妹妹配方) ──
       - name: Assemble project
