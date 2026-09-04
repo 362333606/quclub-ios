@@ -118,6 +118,7 @@ jobs:
           SCHEME
           # App图标(demo的AppIcon.appiconset是空目录=空白logo根因;注入v1.0.2同款品牌图标)
           ICONSET="$HB/HBuilder-Hello/Images.xcassets/AppIcon.appiconset"
+          mkdir -p "$ICONSET"
           cp ios-shell/icon1024.png "$ICONSET/icon1024.png"
           cat > "$ICONSET/Contents.json" <<'JSON'
           {
