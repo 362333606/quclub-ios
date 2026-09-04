@@ -19,7 +19,6 @@ WKWebView 单页壳，承载 https://qyai001.cn。bundleId `cn.qyai001.qiuyu`，
 | Secret | 内容 | 来源 |
 |---|---|---|
 | `APPLE_P12_BASE64` | apple_distribution.p12 的 base64 | `base64 -w0 证书/apple_distribution.p12` |
-| `APPLE_P12_PASSWORD` | p12 密码 | `Qyai2026app` |
 | `APPSTORE_PROFILE_BASE64` | App Store profile 的 base64 | 建 profile 后导出 |
 | `ASC_API_KEY_P8` | AuthKey_api.p8 文件**原文**（非base64） | 证书/AuthKey_api.p8 |
 | `ASC_KEY_ID` | `8889JD3CN2` | — |
