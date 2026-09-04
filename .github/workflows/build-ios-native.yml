@@ -147,6 +147,8 @@ jobs:
         run: |
           set -o pipefail
           cd /tmp/sdk/out/SDK/HBuilder-Hello
+          xcodebuild -version; sysctl -n hw.ncpu; df -h / | tail -1
+          date '+%F %T archive start'
           xcodebuild archive \
             -workspace HBuilder-Hello.xcworkspace \
             -scheme HBuilder \
@@ -155,12 +157,22 @@ jobs:
             -archivePath "$RUNNER_TEMP/QuClub.xcarchive" \
             CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
             MARKETING_VERSION=2.0.0 \
+            ENABLE_BITCODE=NO \
             CODE_SIGN_STYLE=Manual \
             PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
             CODE_SIGN_IDENTITY="Apple Distribution" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
-            | grep -E "error|warning: |ARCHIVE" || true
+            2>&1 | tee "$RUNNER_TEMP/xcodebuild.log" | grep -E "error|warning: |ARCHIVE|==>" || true
+          date '+%F %T archive end'
           test -d "$RUNNER_TEMP/QuClub.xcarchive"
+
+      - name: Always upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-log-${{ github.run_number }}
+          path: ${{ runner.temp }}/xcodebuild.log
+          retention-days: 7
 
       - name: Export IPA (ad-hoc)
         run: |
